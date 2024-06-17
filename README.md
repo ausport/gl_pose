@@ -14,6 +14,15 @@ To set up the required environment, run the following command:
 conda env create -f environment.yml
 ```
 
+## Usage
+
+Open the ```pose_3D.ipynb``` by starting Jupyter Notebook:
+
+```sh
+# Run a Jupyter Notebook session
+jupyter notebook
+```
+
 ## Acknowledgements
 
 This project makes use of the ASPset dataset. Please refer to the following publication for more details:

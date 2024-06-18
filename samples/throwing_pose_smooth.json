@@ -1,26 +1,6 @@
 [
   {
     "data": {
-      "data": [],
-      "pose_format": "ASPSET",
-      "sample_rate": 50.0,
-      "timestamp": 0.0,
-      "track_ids": []
-    },
-    "frame": 0
-  },
-  {
-    "data": {
-      "data": [],
-      "pose_format": "ASPSET",
-      "sample_rate": 50.0,
-      "timestamp": 0.02,
-      "track_ids": []
-    },
-    "frame": 1
-  },
-  {
-    "data": {
       "data": [
         [
           [

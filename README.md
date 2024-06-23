@@ -6,7 +6,7 @@ An OpenGL visualisation tool for 3D pose models.
 
 This project is an OpenGL-based visualisation tool designed to render and display 3D pose models. The original pose models used in this project are trained using the [aspset-510 dataset](https://github.com/anibali/aspset-510).
 
-![Alt text](samples/sample.png)
+![Alt text](samples/sample1.png)
 
 ## Requirements
 

@@ -2,11 +2,11 @@ name: gl_pose
 channels:
   - defaults
 dependencies:
+  - pip=23.1.2
   - python=3.10.14=h955ad1f_1
   - pip:
       - notebook==7.2.1
       - numpy==1.21.2
       - opencv-python==4.10.0.82
       - pyglet==1.5.28
-      - pyyaml==6.0.1
 prefix: /home/stuart/miniconda3/envs/gl_pose

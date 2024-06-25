@@ -9,4 +9,4 @@ dependencies:
       - numpy==1.21.2
       - opencv-python==4.10.0.82
       - pyglet==1.5.28
-prefix: /home/stuart/miniconda3/envs/gl_pose
+

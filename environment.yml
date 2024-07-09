@@ -3,10 +3,10 @@ channels:
   - defaults
 dependencies:
   - pip=23.1.2
-  - python=3.10.14=h955ad1f_1
+  - python=3.10
   - pip:
-      - notebook==7.2.1
-      - numpy==1.21.2
-      - opencv-python==4.10.0.82
+      - notebook
+      - numpy
+      - opencv-python
       - pyglet==1.5.28
 

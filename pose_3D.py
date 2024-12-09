@@ -1,11 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # 3D Pose Viz
-
-# In[27]:
-
-
 import pyglet
 from pyglet.gl import *
 from pyglet.window import key
@@ -18,19 +10,14 @@ import json
 import math
 
 
-# ## Set the env parameters..
-
-# In[28]:
-
-
 RENDER_FPS = 50
 RENDER_INTERVAL = 1 / RENDER_FPS
 WINDOW_WIDTH = 1920
 WINDOW_HEIGHT = 1280
 
 
-BALL_PATH = "./samples/short_kick_2_A2_ball.json"
-FILE_PATH = "./samples/short_kick_2_A2_pose.json"
+BALL_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz_ball.json"
+FILE_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz.json"
 
 
 file_root, _ = os.path.splitext(FILE_PATH)
@@ -53,9 +40,7 @@ RECORD_MODE = False
 TOGGLE_TRAILS = True
 N_TRAIL_LENGTH = 15
 
-
-
-# In[29]:
+ROTATION_ANGLE = 0
 
 
 ASPSET_KEYPOINT_NAMES = np.array([
@@ -96,7 +81,10 @@ global_axis_max = np.array([0, 0, 0])
 global_axis_min = np.array([0, 0, 0])
 
 frame = 0
+ball_rotation = 40
 
+# Get the ball data
+# TODO - create a ball tracking json file that follows the same format as the pose data
 with open(BALL_PATH, 'r') as f:
     json_data = f.read()
 
@@ -115,7 +103,6 @@ for pose in ball_data:
 
 # Convert lists to NumPy arrays for easier manipulation
 ball_positions_np = np.array(ball_positions)  # Contains only ball keypoints
-
 
 with open(FILE_PATH, 'r') as f:
     json_data = f.read()
@@ -376,6 +363,101 @@ class PoseRenderer:
                     self.draw_joint_center(pos[0], pos[1], pos[2])
             disable_lighting()
 
+class BallRenderer:
+    def __init__(self, ball_positions, ball_trail_data=[]):
+        self.ball_positions = ball_positions
+        self.ball_trail_data = ball_trail_data
+        self.origin = [0, 0]
+
+    @staticmethod
+    def ensure_3d(coords):
+        """Ensure that the input coordinates have a third dimension (z)."""
+        if len(coords) == 2:
+            return [coords[0], coords[1], 0]  # Return as a list
+        return list(coords)  # Ensure consistency in the output
+
+
+    def draw_trail_line(self, trail_points, width=1.0, r=1.0, g=1.0, b=1.0):
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        num_points = len(trail_points)
+        if num_points < 2:
+            return
+
+        glBegin(GL_TRIANGLE_STRIP)
+        for i, point in enumerate(trail_points):
+            x, y, z = self.ensure_3d(point)
+
+            x = x + global_axis_means[0]
+            y = (y - global_axis_means[1]) + global_axis_min[1]
+            z = z - global_axis_means[2]
+
+            a = i / (num_points - 1)  # Calculate opacity based on index
+            glColor4f(r, g, b, a)
+
+            if i == 0:
+                dx, dy, dz = trail_points[i + 1][0] - x, trail_points[i + 1][1] - y, trail_points[i + 1][2] - z
+            elif i == num_points - 1:
+                dx, dy, dz = x - trail_points[i - 1][0], y - trail_points[i - 1][1], z - trail_points[i - 1][2]
+            else:
+                dx, dy, dz = trail_points[i + 1][0] - trail_points[i - 1][0], trail_points[i + 1][1] - trail_points[i - 1][1], trail_points[i + 1][2] - trail_points[i - 1][2]
+
+            length = (dx ** 2 + dy ** 2 + dz ** 2) ** 0.5
+            if length > 0:
+                dx /= length
+                dy /= length
+                dz /= length
+
+            nx, ny, nz = -dy, dx, 0
+            x1, y1, z1 = x + width * nx, y + width * ny, z + width * nz
+            x2, y2, z2 = x - width * nx, y - width * ny, z - width * nz
+
+            glVertex3f(x1/20, -y1/20, z1/20)
+            glVertex3f(x2/20, -y2/20, z2/20)
+        glEnd()
+
+    def draw_ball_center(self, x, y, z, radius=0.8, slices=16, stacks=16):
+        global ball_rotation
+        x = x + global_axis_means[0]
+        y = (y - global_axis_means[1]) + global_axis_min[1]
+        z = z - global_axis_means[2]
+
+        glPushMatrix()
+        glTranslatef(x / 20, -y / 20, z / 20)  # Flip y-axis here by negating y
+        glRotatef(ball_rotation, 1.0, 0.0, 0.0)  # Rotate around the y-axis
+        print("Drawing ball at:", x, y, z, "with angle:", ball_rotation)
+
+        glColor3f(0.5, 0.5, 0.0)  # Yellow color for the spheres (change as needed)
+
+        # Scale to create an oval shape (elongate along one axis, e.g., y-axis)
+        glScalef(1.0, 1.5, 1.0)  # Adjust these values for desired proportions
+
+        quadric = gluNewQuadric()
+        gluSphere(quadric, radius, slices, stacks)  # Sphere becomes an oval due to scaling
+        gluDeleteQuadric(quadric)
+
+        glPopMatrix()
+
+        ball_rotation += 1.0  # Increment the rotation angle
+
+    def draw(self):
+        if len(self.ball_positions) > 0:
+            # Draw the ball trails first
+            if TOGGLE_TRAILS:
+                for points in self.ball_trail_data:
+                    if len(self.ball_trail_data[points]) > 0:
+                        sorted_data = sorted(self.ball_trail_data[points], key=lambda x: x['frame'])
+                        sorted_pos = [self.ensure_3d(item['pos']) for item in sorted_data]
+                        self.draw_trail_line(sorted_pos)
+
+            enable_lighting()
+            pos = self.ball_positions
+            print("Ball position:", pos)
+            pos = self.ensure_3d(pos)
+            self.draw_ball_center(pos[0], pos[1], pos[2])
+            disable_lighting()
+
 
 
 def enable_lighting():
@@ -590,6 +672,10 @@ def on_draw():
             if len(current_keypoints) >= 0:
                 pose_model = PoseRenderer(current_keypoints, trail_data, player_id)
                 pose_model.draw()
+                ball_trail_data = []
+                ball_model = BallRenderer(ball_positions_np[frame], ball_trail_data)
+                ball_model.draw()
+
 
 
     # Switch to 2D mode for on-screen info
@@ -607,18 +693,18 @@ def on_draw():
     if SHOW_INFO:
         instructions_label.draw()
                 
-    if RECORD_MODE:       
+    if RECORD_MODE:
         # Convert the window buffer to a numpy array
         buffer = pyglet.image.get_buffer_manager().get_color_buffer()
         image_data = buffer.get_image_data()
         data = image_data.get_data()
-        
+
         # Convert to numpy array
         image_as_np = np.frombuffer(data, dtype=np.uint8).reshape(WINDOW_HEIGHT, WINDOW_WIDTH, 4)
-        
+
         # Convert RGBA to BGR (OpenCV uses BGR)
         frame_bgr = cv2.flip(cv2.cvtColor(image_as_np, cv2.COLOR_RGBA2BGR), 0)
-    
+
         # Write frame to video
         VIDEO_WRITER.write(frame_bgr)
 

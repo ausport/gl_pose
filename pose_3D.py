@@ -28,9 +28,10 @@ RENDER_INTERVAL = 1 / RENDER_FPS
 WINDOW_WIDTH = 1920
 WINDOW_HEIGHT = 1280
 
-# FILE_PATH = "./samples/running_pose_smooth.json"
-#FILE_PATH = "./samples/throwing_pose_smooth.json"
-FILE_PATH = "./samples/kick_to_mark_2_pose_lpf_5Hz.json"
+
+BALL_PATH = "./samples/short_kick_2_A2_ball.json"
+FILE_PATH = "./samples/short_kick_2_A2_pose.json"
+
 
 file_root, _ = os.path.splitext(FILE_PATH)
 VIDEO_WRITER = cv2.VideoWriter(file_root + ".mp4", cv2.VideoWriter_fourcc(*'mp4v'), RENDER_FPS, (WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -50,7 +51,7 @@ RECORD_MODE = False
 
 # Trail effect 
 TOGGLE_TRAILS = True
-N_TRAIL_LENGTH = 20
+N_TRAIL_LENGTH = 15
 
 
 
@@ -95,6 +96,26 @@ global_axis_max = np.array([0, 0, 0])
 global_axis_min = np.array([0, 0, 0])
 
 frame = 0
+
+with open(BALL_PATH, 'r') as f:
+    json_data = f.read()
+
+ball_positions = []
+ball_data = json.loads(json_data)
+# Iterate through each pose in the data looking for the extra ball
+for pose in ball_data:
+    keypoints = pose['data']['data']  # Assuming this is the list of 2D keypoints
+    if len(keypoints) > 0:
+        # Add a third axis (z = 0) for each keypoint in each instance
+        keypoints_with_z = [[[x, y, 0] for x, y in instance] for instance in keypoints]
+
+        for instance in keypoints_with_z:
+            if len(instance) == 22:  # Check if the instance contains a ball keypoint
+                ball_positions.append(instance.pop(21))  # Extract and remove the ball keypoint
+
+# Convert lists to NumPy arrays for easier manipulation
+ball_positions_np = np.array(ball_positions)  # Contains only ball keypoints
+
 
 with open(FILE_PATH, 'r') as f:
     json_data = f.read()
@@ -240,10 +261,11 @@ def draw_surface():
 
 
 class PoseRenderer:
-    def __init__(self, pose, trail_data=[]):
+    def __init__(self, pose, trail_data=[], player_id=0):
         self.pose = pose
         self.trail_data = trail_data
         self.origin = [0, 0]
+        self.player_id = player_id
 
     @staticmethod
     def ensure_3d(coords):
@@ -253,7 +275,7 @@ class PoseRenderer:
         return list(coords)  # Ensure consistency in the output
 
 
-    def draw_trail_line(self, trail_points, width=5.0, r=1.0, g=1.0, b=1.0):
+    def draw_trail_line(self, trail_points, width=1.0, r=1.0, g=1.0, b=1.0):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
@@ -329,12 +351,12 @@ class PoseRenderer:
     def draw(self):
         if len(self.pose) > 0:
             # Draw the joint centre trails first
-            if TOGGLE_TRAILS:
-                for points in self.trail_data:
-                    if len(self.trail_data[points]) > 0:
-                        sorted_data = sorted(self.trail_data[points], key=lambda x: x['frame'])
-                        sorted_pos = [self.ensure_3d(item['pos']) for item in sorted_data]
-                        self.draw_trail_line(sorted_pos)
+            # if TOGGLE_TRAILS:
+            #     for points in self.trail_data:
+            #         if len(self.trail_data[points]) > 0:
+            #             sorted_data = sorted(self.trail_data[points], key=lambda x: x['frame'])
+            #             sorted_pos = [self.ensure_3d(item['pos']) for item in sorted_data]
+            #             self.draw_trail_line(sorted_pos)
             
             keypoint_index = {name: idx for idx, name in enumerate(ASPSET_KEYPOINT_NAMES)}
             
@@ -342,8 +364,8 @@ class PoseRenderer:
                 from_keypoint, to_keypoint = pair
                 from_index = keypoint_index[from_keypoint]
                 to_index = keypoint_index[to_keypoint]               
-                from_tuple = self.ensure_3d(self.pose[0][from_index])
-                to_tuple = self.ensure_3d(self.pose[0][to_index])
+                from_tuple = self.ensure_3d(self.pose[self.player_id][from_index])
+                to_tuple = self.ensure_3d(self.pose[self.player_id][to_index])
                 # Draw segment
                 self.draw_limb_length(from_tuple, to_tuple)
 
@@ -537,34 +559,39 @@ def on_draw():
     # Rotate the modelview matrix to swap the x and z axes
     glRotatef(90, 1, 0, 0)  # Rotate 90 degrees around the x-axis
 
-    # Draw the pose and the historical trails..
+    # Draw the poses and their historical trails
     current_pose = pose_data[frame]
     current_keypoints = current_pose['data']['data']
 
     if len(current_keypoints) > 0:
 
-        # Assemble the trail data from the current frame
-        trail_data = {keypoint: [] for keypoint in SHOW_TRAILS}
+        current_ball = ball_positions_np[frame]
+        print(current_ball)
 
-        for frame_idx in range(max(0, frame-20), frame):
-            pose_for_frame = pose_data[frame_idx]
-            if len(pose_for_frame['data']['data']) > 0:
-                trail_keypoints = pose_for_frame['data']['data'][0]
-        
-                # Update the joint data dictionary
-                for keypoint, position in zip(SHOW_TRAILS, trail_keypoints):
-                    if not any(entry["frame"] == frame_idx for entry in trail_data[keypoint]):
-                        trail_data[keypoint].append({"frame": frame_idx, "pos": tuple(position)})
-                        
-                        # Keep only the last n tuples
-                        if len(trail_data[keypoint]) > N_TRAIL_LENGTH:
-                            trail_data[keypoint].pop(0)
+        for player_id in [0, 1]:
+            # Assemble the trail data from the current frame
+            trail_data = {keypoint: [] for keypoint in SHOW_TRAILS}
 
-        # Draw the pose     
-        if len(current_keypoints) >= 0:
-            pose_model = PoseRenderer(current_keypoints, trail_data)
-            pose_model.draw()
-    
+            for frame_idx in range(max(0, frame-20), frame):
+                pose_for_frame = pose_data[frame_idx]
+                if len(pose_for_frame['data']['data']) > 0:
+                    trail_keypoints = pose_for_frame['data']['data'][player_id]
+
+                    # Update the joint data dictionary
+                    for keypoint, position in zip(SHOW_TRAILS, trail_keypoints):
+                        if not any(entry["frame"] == frame_idx for entry in trail_data[keypoint]):
+                            trail_data[keypoint].append({"frame": frame_idx, "pos": tuple(position)})
+
+                            # Keep only the last n tuples
+                            if len(trail_data[keypoint]) > N_TRAIL_LENGTH:
+                                trail_data[keypoint].pop(0)
+
+            # Draw the pose
+            if len(current_keypoints) >= 0:
+                pose_model = PoseRenderer(current_keypoints, trail_data, player_id)
+                pose_model.draw()
+
+
     # Switch to 2D mode for on-screen info
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()

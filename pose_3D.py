@@ -13,7 +13,7 @@ import math
 RENDER_FPS = 62
 RENDER_INTERVAL = 1 / RENDER_FPS
 WINDOW_WIDTH = 1920
-WINDOW_HEIGHT = 1280
+WINDOW_HEIGHT = 1080
 
 
 BALL_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz_ball.json"

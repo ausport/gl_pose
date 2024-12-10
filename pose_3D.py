@@ -19,8 +19,8 @@ WINDOW_HEIGHT = 1280
 BALL_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz_ball.json"
 FILE_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz.json"
 
-BALL_PATH = "./samples/short_kick_3_A2_pose_lpf_5Hz_ball.json"
-FILE_PATH = "./samples/short_kick_3_A2_pose_lpf_5Hz.json"
+# BALL_PATH = "./samples/short_kick_3_A2_pose_lpf_5Hz_ball.json"
+# FILE_PATH = "./samples/short_kick_3_A2_pose_lpf_5Hz.json"
 
 
 file_root, _ = os.path.splitext(FILE_PATH)
@@ -41,7 +41,7 @@ RECORD_MODE = False
 
 # Trail effect 
 TOGGLE_TRAILS = True
-N_TRAIL_LENGTH = 15
+N_TRAIL_LENGTH = 20
 
 
 ASPSET_KEYPOINT_NAMES = np.array([
@@ -104,11 +104,13 @@ for pose in ball_data:
 
 # Convert lists to NumPy arrays for easier manipulation
 ball_positions_np = np.array(ball_positions)  # Contains only ball keypoints
+print("Ball positions shape:", ball_positions_np.shape)
 
 with open(FILE_PATH, 'r') as f:
     json_data = f.read()
 
 pose_data = json.loads(json_data)
+print("Number of frames:", len(pose_data))
 
 # Initialize lists to accumulate data
 all_keypoints = []
@@ -123,6 +125,7 @@ for pose in pose_data:
 
 # Convert all_keypoints to a NumPy array for easier manipulation
 data_np = np.array(all_keypoints)
+print("Data shape:", data_np.shape)
 
 # Calculate mean along axis 0 to get global mean of each (x, y, z) tuple
 global_axis_means = np.mean(data_np, axis=(0, 1))  # Global mean of x, y, z
@@ -333,13 +336,13 @@ class PoseRenderer:
 
     def draw(self):
         if len(self.pose) > 0:
-            # Draw the joint centre trails first
-            if TOGGLE_TRAILS:
-                for points in self.trail_data:
-                    if len(self.trail_data[points]) > 0:
-                        sorted_data = sorted(self.trail_data[points], key=lambda x: x['frame'])
-                        sorted_pos = [self.ensure_3d(item['pos']) for item in sorted_data]
-                        self.draw_trail_line(sorted_pos)
+            # # Draw the joint centre trails first
+            # if False:
+            #     for points in self.trail_data:
+            #         if len(self.trail_data[points]) > 0:
+            #             sorted_data = sorted(self.trail_data[points], key=lambda x: x['frame'])
+            #             sorted_pos = [self.ensure_3d(item['pos']) for item in sorted_data]
+            #             self.draw_trail_line(sorted_pos)
             
             keypoint_index = {name: idx for idx, name in enumerate(ASPSET_KEYPOINT_NAMES)}
             
@@ -360,8 +363,8 @@ class PoseRenderer:
             disable_lighting()
 
 class BallRenderer:
-    def __init__(self, ball_positions, ball_trail_data=[]):
-        self.ball_positions = ball_positions
+    def __init__(self, ball_position, ball_trail_data):
+        self.ball_position = ball_position
         self.ball_trail_data = ball_trail_data
         self.origin = [0, 0]
 
@@ -381,10 +384,13 @@ class BallRenderer:
         if num_points < 2:
             return
 
-        glBegin(GL_TRIANGLE_STRIP)
-        for i, point in enumerate(trail_points):
-            x, y, z = self.ensure_3d(point)
+        emissive_color = (0.4, 0.2, 0.2, 0.2)  # Example: orange glow
+        glMaterialfv(GL_FRONT, GL_EMISSION, (GLfloat * 4)(*emissive_color))
 
+        glBegin(GL_TRIANGLE_STRIP)
+
+        for i, point in enumerate(trail_points):
+            x, y, z = point
             x = x + global_axis_means[0]
             y = (y - global_axis_means[1]) + global_axis_min[1]
             z = z - global_axis_means[2]
@@ -412,6 +418,9 @@ class BallRenderer:
             glVertex3f(x1/20, -y1/20, z1/20)
             glVertex3f(x2/20, -y2/20, z2/20)
         glEnd()
+        no_emission = (0.0, 0.0, 0.0, 1.0)
+        glMaterialfv(GL_FRONT, GL_EMISSION, (GLfloat * 4)(*no_emission))
+
 
     def draw_ball_center(self, x, y, z, radius=0.8, slices=16, stacks=16):
         global ball_rotation
@@ -445,18 +454,15 @@ class BallRenderer:
         ball_rotation += 8.0  # Increment the rotation angle
 
     def draw(self):
-        if len(self.ball_positions) > 0:
+        enable_lighting()
+
+        if len(self.ball_position) > 0:
             # Draw the ball trails first
             if TOGGLE_TRAILS:
-                for points in self.ball_trail_data:
-                    if len(self.ball_trail_data[points]) > 0:
-                        sorted_data = sorted(self.ball_trail_data[points], key=lambda x: x['frame'])
-                        sorted_pos = [self.ensure_3d(item['pos']) for item in sorted_data]
-                        self.draw_trail_line(sorted_pos)
+                xyz_tuples = [(float(pos['pos'][0]), float(pos['pos'][1]), float(pos['pos'][2])) for pos in self.ball_trail_data]
+                self.draw_trail_line(xyz_tuples)
 
-            enable_lighting()
-            pos = self.ball_positions
-            print("Ball position:", pos)
+            pos = self.ball_position
             pos = self.ensure_3d(pos)
             self.draw_ball_center(pos[0], pos[1], pos[2])
             disable_lighting()
@@ -467,7 +473,7 @@ def enable_lighting():
 
     # Light 0 properties
     glEnable(GL_LIGHT0)
-    light_diffuse0 = (1.0, 1.0, 1.0, 1.0)
+    light_diffuse0 = (0.3, 0.3, 0.3, 1.0)
     light_ambient0 = (0.1, 0.1, 0.1, 1.0)
     light_position0 = (500.0, 500.0, 1000.0, 1.0)
     glLightfv(GL_LIGHT0, GL_DIFFUSE, (GLfloat * 4)(*light_diffuse0))
@@ -477,7 +483,7 @@ def enable_lighting():
     glEnable(GL_COLOR_MATERIAL)
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
 
-    global_ambient = (0.1, 0.1, 0.1, 1.0)
+    global_ambient = (0.01, 0.01, 0.01, 1.0)
     glLightModelfv(GL_LIGHT_MODEL_AMBIENT, (GLfloat * 4)(*global_ambient))
 
 
@@ -637,9 +643,6 @@ def on_draw():
 
     if len(current_keypoints) > 0:
 
-        current_ball = ball_positions_np[frame]
-        print(current_ball)
-
         for player_id in [0, 1]:
             # Assemble the trail data from the current frame
             trail_data = {keypoint: [] for keypoint in SHOW_TRAILS}
@@ -662,9 +665,17 @@ def on_draw():
             if len(current_keypoints) >= 0:
                 pose_model = PoseRenderer(current_keypoints, trail_data, player_id)
                 pose_model.draw()
-                ball_trail_data = []
-                ball_model = BallRenderer(ball_positions_np[frame], ball_trail_data)
-                ball_model.draw()
+
+        # Draw the ball
+        ball_trail_data = []
+        for frame_idx in range(max(0, frame - N_TRAIL_LENGTH), frame):
+            ball_position = ball_positions_np[frame_idx]
+            ball_trail_data.append({"frame": frame_idx, "pos": tuple(ball_position)})
+
+        print("Ball trail data:", ball_trail_data)
+
+        ball_model = BallRenderer(ball_positions_np[frame], ball_trail_data)
+        ball_model.draw()
 
 
 

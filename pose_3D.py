@@ -10,7 +10,7 @@ import json
 import math
 
 
-RENDER_FPS = 50
+RENDER_FPS = 62
 RENDER_INTERVAL = 1 / RENDER_FPS
 WINDOW_WIDTH = 1920
 WINDOW_HEIGHT = 1280
@@ -19,9 +19,12 @@ WINDOW_HEIGHT = 1280
 BALL_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz_ball.json"
 FILE_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz.json"
 
+BALL_PATH = "./samples/short_kick_3_A2_pose_lpf_5Hz_ball.json"
+FILE_PATH = "./samples/short_kick_3_A2_pose_lpf_5Hz.json"
+
 
 file_root, _ = os.path.splitext(FILE_PATH)
-VIDEO_WRITER = cv2.VideoWriter(file_root + ".mp4", cv2.VideoWriter_fourcc(*'mp4v'), RENDER_FPS, (WINDOW_WIDTH, WINDOW_HEIGHT))
+# VIDEO_WRITER = cv2.VideoWriter(file_root + ".mp4", cv2.VideoWriter_fourcc(*'mp4v'), RENDER_FPS, (WINDOW_WIDTH, WINDOW_HEIGHT))
 
 # Play the animation automatically
 AUTO_PLAY = False
@@ -39,8 +42,6 @@ RECORD_MODE = False
 # Trail effect 
 TOGGLE_TRAILS = True
 N_TRAIL_LENGTH = 15
-
-ROTATION_ANGLE = 0
 
 
 ASPSET_KEYPOINT_NAMES = np.array([
@@ -133,36 +134,23 @@ centered_data = data_np - global_axis_means  # Broadcasting subtracts [x_mean, y
 global_axis_max = np.max(centered_data, axis=(0, 1))
 global_axis_min = np.min(centered_data, axis=(0, 1))
 
-print("Global_axis_means (x, y, z):", global_axis_means)
-print("Global_axis_min (x, y, z):", global_axis_min)
-print("Global_axis_max (x, y, z):", global_axis_max)
+# print("Global_axis_means (x, y, z):", global_axis_means)
+# print("Global_axis_min (x, y, z):", global_axis_min)
+# print("Global_axis_max (x, y, z):", global_axis_max)
 
 
 glEnable(GL_DEPTH_TEST)
 glEnable(GL_LINE_SMOOTH)
-camera_position = [-15, -15, 5]
 
-
-zoom_factor = 32.
-rotation_angle_horizontal = 1.3
-rotation_angle_vertical = 0.9
-
-viewpoints = [{"zoom_factor": 44.1, "rotation_angle_horizontal": 0.23, "rotation_angle_vertical": -0.27},
-              {"zoom_factor": 34.2, "rotation_angle_horizontal": 2.54, "rotation_angle_vertical": -0.4},
-              {"zoom_factor": 34.2, "rotation_angle_horizontal": -0.46, "rotation_angle_vertical": -3.0},
-              {"zoom_factor": 72.7, "rotation_angle_horizontal": -3.12, "rotation_angle_vertical": -0.17}
+viewpoints = [{"zoom_factor": 15.5, "rotation_angle_horizontal": 5.3, "rotation_angle_vertical": -0.4299, "camera_position": [20, 10, 5], "look_at": [235, -5, 0]},
+              {"zoom_factor": 27.27, "rotation_angle_horizontal": 5.3, "rotation_angle_vertical": -0.4299, "camera_position": [20, 10, 5], "look_at": [235, -5, 0]},
+              {"zoom_factor": 14.289, "rotation_angle_horizontal": 0.71, "rotation_angle_vertical": -0.6999, "camera_position": [20, 18, 5], "look_at": [245, -15, 0]},
+              {"zoom_factor": 22.869, "rotation_angle_horizontal": 0.71, "rotation_angle_vertical": -0.6999, "camera_position": [20, 18, 5], "look_at": [245, -15, 0]},
              ]
 
 viewpoint = viewpoints[CURRENT_VIEW]
 
-zoom_factor, rotation_angle_horizontal, rotation_angle_vertical = viewpoint.values()
-
-# zoom_factor: 16.599999999999966, rotation_angle_horizontal: 5.2699999999999925, rotation_angle_vertical: -0.42999999999999994
-# camera_position x: 20, camera_position y: 10
-# look_at x: 235, look_at y: -5
-zoom_factor, rotation_angle_horizontal, rotation_angle_vertical = 15.5, 5.3,  -0.4299
-camera_position = [20, 10, 5]
-look_at = [235, -5, 0]
+zoom_factor, rotation_angle_horizontal, rotation_angle_vertical, camera_position, look_at = viewpoint.values()
 
 SURFACE_LENGTH = 200
 SURFACE_WIDTH = 200
@@ -171,7 +159,6 @@ MAX_VERTICAL_ANGLE = math.pi / 2 - 0.1  # Just below straight up
 MIN_VERTICAL_ANGLE = -MAX_VERTICAL_ANGLE  # Just below straight down
 
 window = pyglet.window.Window(width=WINDOW_WIDTH, height=WINDOW_HEIGHT, resizable=False)
-
 
 sample_label = pyglet.text.Label(
     os.path.basename(FILE_PATH),
@@ -302,17 +289,26 @@ class PoseRenderer:
             glVertex3f(x2/20, -y2/20, z2/20)
         glEnd()
     
-    def draw_joint_center(self, x, y, z, radius=0.5, slices=16, stacks=16):
+    def draw_joint_center(self, x, y, z, radius=0.3, slices=16, stacks=16):
         x = x + global_axis_means[0]
         y = (y - global_axis_means[1]) + global_axis_min[1]
         z = z - global_axis_means[2]
         
         glPushMatrix()
         glTranslatef(x/20, -y/20, z/20)  # Flip y-axis here by negating y
-        glColor3f(1.0, 1.0, 0.0)  # Yellow color for the spheres
+
+        # Set emissive material properties (glow color)
+        emissive_color = (1.0 , 1.0, 0.0, 0.5)  # Example: orange glow
+        glMaterialfv(GL_FRONT, GL_EMISSION, (GLfloat * 4)(*emissive_color))
+
+        # Draw the sphere
         quadric = gluNewQuadric()
         gluSphere(quadric, radius, slices, stacks)
         gluDeleteQuadric(quadric)
+
+        # Reset emissive material to avoid affecting other objects
+        no_emission = (0.0, 0.0, 0.0, 1.0)
+        glMaterialfv(GL_FRONT, GL_EMISSION, (GLfloat * 4)(*no_emission))
         glPopMatrix()
 
     def draw_limb_length(self, from_tuple, to_tuple, line_width=2.0):
@@ -327,7 +323,7 @@ class PoseRenderer:
         to_y = (to_y - global_axis_means[1]) + global_axis_min[1]
         to_z = to_z - global_axis_means[2]
 
-        glColor3f(0.5, 0.5, 0.35)  # Light grey color for the line
+        glColor3f(0.4, 0.4, 0.0)  # Light grey color for the line
         glLineWidth(line_width)
         glBegin(GL_LINES)
         glVertex3f(from_x / 20, -from_y / 20, from_z / 20)
@@ -338,12 +334,12 @@ class PoseRenderer:
     def draw(self):
         if len(self.pose) > 0:
             # Draw the joint centre trails first
-            # if TOGGLE_TRAILS:
-            #     for points in self.trail_data:
-            #         if len(self.trail_data[points]) > 0:
-            #             sorted_data = sorted(self.trail_data[points], key=lambda x: x['frame'])
-            #             sorted_pos = [self.ensure_3d(item['pos']) for item in sorted_data]
-            #             self.draw_trail_line(sorted_pos)
+            if TOGGLE_TRAILS:
+                for points in self.trail_data:
+                    if len(self.trail_data[points]) > 0:
+                        sorted_data = sorted(self.trail_data[points], key=lambda x: x['frame'])
+                        sorted_pos = [self.ensure_3d(item['pos']) for item in sorted_data]
+                        self.draw_trail_line(sorted_pos)
             
             keypoint_index = {name: idx for idx, name in enumerate(ASPSET_KEYPOINT_NAMES)}
             
@@ -419,16 +415,20 @@ class BallRenderer:
 
     def draw_ball_center(self, x, y, z, radius=0.8, slices=16, stacks=16):
         global ball_rotation
+        global frame
+
         x = x + global_axis_means[0]
         y = (y - global_axis_means[1]) + global_axis_min[1]
         z = z - global_axis_means[2]
 
         glPushMatrix()
         glTranslatef(x / 20, -y / 20, z / 20)  # Flip y-axis here by negating y
-        glRotatef(ball_rotation, 1.0, 0.0, 0.0)  # Rotate around the y-axis
-        print("Drawing ball at:", x, y, z, "with angle:", ball_rotation)
 
-        glColor3f(0.5, 0.5, 0.0)  # Yellow color for the spheres (change as needed)
+        _r = 0.4 if frame < 50 else ball_rotation
+        glRotatef(_r, 1.0, 0.0, 0.0)  # Rotate around the y-axis
+
+        emissive_color = (0.5, 0.1, 0.0, 0.1)  # Example: orange glow
+        glMaterialfv(GL_FRONT, GL_EMISSION, (GLfloat * 4)(*emissive_color))
 
         # Scale to create an oval shape (elongate along one axis, e.g., y-axis)
         glScalef(1.0, 1.5, 1.0)  # Adjust these values for desired proportions
@@ -437,9 +437,12 @@ class BallRenderer:
         gluSphere(quadric, radius, slices, stacks)  # Sphere becomes an oval due to scaling
         gluDeleteQuadric(quadric)
 
+        # Reset emissive material to avoid affecting other objects
+        no_emission = (0.0, 0.0, 0.0, 1.0)
+        glMaterialfv(GL_FRONT, GL_EMISSION, (GLfloat * 4)(*no_emission))
         glPopMatrix()
 
-        ball_rotation += 1.0  # Increment the rotation angle
+        ball_rotation += 8.0  # Increment the rotation angle
 
     def draw(self):
         if len(self.ball_positions) > 0:
@@ -459,37 +462,24 @@ class BallRenderer:
             disable_lighting()
 
 
-
 def enable_lighting():
     glEnable(GL_LIGHTING)
-    
-    # Enable the first light source (GL_LIGHT0)
+
+    # Light 0 properties
     glEnable(GL_LIGHT0)
-    
-    # Define properties for the first light source (GL_LIGHT0)
     light_diffuse0 = (1.0, 1.0, 1.0, 1.0)
     light_ambient0 = (0.1, 0.1, 0.1, 1.0)
-    light_position0 = (0.0, 0.0, 1000.0, 1.0)
-    
+    light_position0 = (500.0, 500.0, 1000.0, 1.0)
     glLightfv(GL_LIGHT0, GL_DIFFUSE, (GLfloat * 4)(*light_diffuse0))
     glLightfv(GL_LIGHT0, GL_AMBIENT, (GLfloat * 4)(*light_ambient0))
     glLightfv(GL_LIGHT0, GL_POSITION, (GLfloat * 4)(*light_position0))
-    
-    # Enable the second light source (GL_LIGHT1)
-    glEnable(GL_LIGHT1)
-    
-    # Define properties for the second light source (GL_LIGHT1)
-    light_diffuse1 = (0.5, 0.5, 0.5, 1.0)  # Example: dimmer light
-    light_ambient1 = (0.05, 0.05, 0.05, 1.0)  # Example: very subtle ambient
-    light_position1 = (-1000.0, -1000.0, 1000.0, 1.0)  # Example: different position
-    
-    glLightfv(GL_LIGHT1, GL_DIFFUSE, (GLfloat * 4)(*light_diffuse1))
-    glLightfv(GL_LIGHT1, GL_AMBIENT, (GLfloat * 4)(*light_ambient1))
-    glLightfv(GL_LIGHT1, GL_POSITION, (GLfloat * 4)(*light_position1))
-    
+
     glEnable(GL_COLOR_MATERIAL)
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE)
-    
+
+    global_ambient = (0.1, 0.1, 0.1, 1.0)
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, (GLfloat * 4)(*global_ambient))
+
 
 def disable_lighting():
     glDisable(GL_LIGHTING)
@@ -519,7 +509,7 @@ def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
         
 def on_key_press(symbol, modifiers):
     global frame
-    global zoom_factor, rotation_angle_horizontal, rotation_angle_vertical
+    global zoom_factor, rotation_angle_horizontal, rotation_angle_vertical, camera_position, look_at
     global AUTO_PLAY
     global SHOW_INFO
     global RECORD_MODE
@@ -597,7 +587,7 @@ def on_key_press(symbol, modifiers):
     elif symbol in keystroke_to_index:
         index = keystroke_to_index[symbol]
         viewpoint = viewpoints[index]
-        zoom_factor, rotation_angle_horizontal, rotation_angle_vertical = viewpoint.values()
+        zoom_factor, rotation_angle_horizontal, rotation_angle_vertical, camera_position, look_at = viewpoint.values()
 
         
 def update_camera():
@@ -609,9 +599,9 @@ def update_camera():
     y = camera_position[1] * zoom_factor * math.sin(rotation_angle_horizontal)
     z = max(camera_position[2] * zoom_factor * -rotation_angle_vertical, 30)    
 
-    gluLookAt(x, y, z,  # Camera position        print("Updating viewpoint:", zoom_factor, rotation_angle_horizontal, rotation_angle_vertical)
+    gluLookAt(x, y, z,                              # Camera position
               look_at[0], look_at[1], look_at[2],   # Look at the origin
-              0, 0, 1)   # Up vector 
+              0, 0, 1)                              # Up vector
 
     print(f"zoom_factor: {zoom_factor}, rotation_angle_horizontal: {rotation_angle_horizontal}, rotation_angle_vertical: {rotation_angle_vertical}")
     print(f"camera_position x: {camera_position[0]}, camera_position y: {camera_position[1]}")
@@ -623,7 +613,7 @@ def on_draw():
     global AUTO_PLAY
     global CYCLE_VIEWS
     global RECORD_MODE
-    global pose_data
+    global pose_data, ball_positions
 
     glClearColor(0.2, 0.2, 0.2, 1)  # Dark grey background color
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -686,11 +676,13 @@ def on_draw():
     glLoadIdentity()
 
     sample_label.draw()
-    
+    instructions_label.draw()
+
     time_label = time_label_with_value(frame/RENDER_FPS)
     time_label.draw()
 
     if SHOW_INFO:
+        print("Showing instructions")
         instructions_label.draw()
                 
     if RECORD_MODE:
@@ -710,7 +702,7 @@ def on_draw():
 
         pyglet.clock.schedule_once(update, RENDER_INTERVAL)
 
-        if frame >= len(pose_data) or RECORD_MODE == False:
+        if frame >= len(ball_positions) or RECORD_MODE == False:
             # Wrap it up..
             VIDEO_WRITER.release()
             RECORD_MODE = False
@@ -731,7 +723,7 @@ def update(dt):
             
             CURRENT_VIEW = CURRENT_VIEW + 1 if CURRENT_VIEW < 3 else 0
             viewpoint = viewpoints[CURRENT_VIEW]
-            zoom_factor, rotation_angle_horizontal, rotation_angle_vertical = viewpoint.values()
+            zoom_factor, rotation_angle_horizontal, rotation_angle_vertical, camera_position, look_at = viewpoint.values()
 
 
 # Event handlers..

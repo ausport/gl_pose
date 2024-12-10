@@ -19,12 +19,22 @@ WINDOW_HEIGHT = 1080
 BALL_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz_ball.json"
 FILE_PATH = "./samples/kick_to_mark_2_A2_pose_lpf_5Hz.json"
 
-# BALL_PATH = "./samples/short_kick_3_A2_pose_lpf_5Hz_ball.json"
-# FILE_PATH = "./samples/short_kick_3_A2_pose_lpf_5Hz.json"
+BALL_PATH = "./samples/short_kick_4_pose_lpf_5Hz_ball.json"
+FILE_PATH = "./samples/short_kick_4_pose_lpf_5Hz.json"
+
+BALL_PATH = "./samples/short_kick_4_A2_pose_lpf_5Hz_ball.json"
+FILE_PATH = "./samples/short_kick_4_A2_pose_lpf_5Hz.json"
+
+BALL_PATH = "./samples/long_kick_pose_lpf_5Hz_ball.json"
+FILE_PATH = "./samples/long_kick_pose_lpf_5Hz.json"
+
+
+BALL_PATH = "./samples/long_kick_origin_pose_lpf_5Hz_ball.json"
+FILE_PATH = "./samples/long_kick_origin_pose_lpf_5Hz.json"
 
 
 file_root, _ = os.path.splitext(FILE_PATH)
-# VIDEO_WRITER = cv2.VideoWriter(file_root + ".mp4", cv2.VideoWriter_fourcc(*'mp4v'), RENDER_FPS, (WINDOW_WIDTH, WINDOW_HEIGHT))
+VIDEO_WRITER = cv2.VideoWriter(file_root + ".mp4", cv2.VideoWriter_fourcc(*'mp4v'), RENDER_FPS, (WINDOW_WIDTH, WINDOW_HEIGHT))
 
 # Play the animation automatically
 AUTO_PLAY = False
@@ -687,7 +697,6 @@ def on_draw():
     glLoadIdentity()
 
     sample_label.draw()
-    instructions_label.draw()
 
     time_label = time_label_with_value(frame/RENDER_FPS)
     time_label.draw()
